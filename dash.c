@@ -6,10 +6,15 @@
 #include"supportedcommands.h"
 #include "tokens.h"
 #include "pipes.h"
+#include "dash.h"
 
-#define MAX_PIPE 256
 #define PROMPT " $ "
 #define INST_SIZE 256
+
+int strequal(const char *str1, const char *str2)
+{
+	return 0 == strcmp(str1, str2);
+}
 
 char* seek_command(char* command, char* path){
 	
@@ -36,21 +41,50 @@ void cd(char* param)
 	chdir(param);
 }
 
+enum dash_command
+{
+	DASH_INTERNAL_OK,
+	DASH_NOT_FOUND
+};
 
-int execute_command(char** command){
+int execute_command(char** command, int *keep_running){
 	
 	if(strcmp(command[0], "exit") == 0){
-		return 0;
+		*keep_running = FALSE;
+		return DASH_INTERNAL_OK;
 	}
 	else if(strcmp(command[0], "bye") == 0){
 		printf("Bye! \\o/\n");
-		return 0;
+		*keep_running = FALSE;
+		return DASH_INTERNAL_OK;
 	}
 	else if(0 == strcmp(command[0], "cd")){
 		cd(command[1]);
-		return 1;
+		return DASH_INTERNAL_OK;
 	}
 	else return 1;
+}
+
+int execute_process(const char *process, char * const * program_argv, int wait_for_finish)
+{
+	int pid = fork();
+	if (pid == 0)
+	{
+		execvp(process, program_argv);
+		perror("fork error");
+		_exit(EXIT_FAILURE);
+	}
+	else
+	{
+		if (wait_for_finish)
+		{
+			int status;
+			waitpid(pid, &status, 0);
+			return status;
+		}
+
+		return pid;
+	}
 }
 
 
@@ -86,28 +120,24 @@ int main(void)
 		if(fgets(getbuffer, INST_SIZE, stdin) != NULL){
 			
 			if((terminal = tokenize(getbuffer, &num_args)) != 0){
-				if((num_inst = has_pipe(terminal, num_args, inst_limits))!= 0){
-					for(i=0;i<num_inst;i++){
-						printf("i:%d\n", i);
-						fflush(stdin);
-						printf("m ->%s\n", get_instruction(i, inst_limits, terminal));
-					}
-					//do something!
+				int num_commands;
+
+
+				if (strequal(terminal[0], "|"))
+				{
+					printf("Caracter inseperado '|'\n");
+					continue;
 				}
-				else //tirar esse else, acredito, quando eu arrumar o pipeT
+
+				num_commands = number_of_piped_commands(terminal, num_args, inst_limits);
+
+				
 				if(founded(terminal[0], commands, cadastred_comm)){
 					keep_running = execute_command(terminal);
 				}
 
 				else if((find_in_path = seek_command(terminal[0], path)) != NULL){
-					son = fork();
-					if(son == 0){
-						execvp(terminal[0], terminal);
-					}
-					else {
-						int status;
-						wait(&status);
-					}
+					execute_process(terminal[0], terminal, TRUE);
 				}
 				else printf("Comando %s nao encontrado!\n", terminal[0]);
 			}

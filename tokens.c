@@ -48,6 +48,6 @@ char** tokenize(char *msg, int* return_number_of_parameters){
 		result = strtok(NULL, delim);
 	}
 	if (i == 0)
-		return i;
+		return 0;
 	else return returned;
 }

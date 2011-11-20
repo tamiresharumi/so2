@@ -2,21 +2,39 @@
 #include <string.h>
 #include <stdio.h>
 #include "pipes.h"
+#include "dash.h"
 
-int has_pipe(char** commands, int size, int matrix_of_positions[])
+int number_of_piped_commands(char **commands, int num_commands, int *starting_indices)
+{
+	int i;
+	int pipe_number = 0;
+
+	for (i=0 ; i<num_commands ; ++i) {
+		if (strequal("|", commands[i])) {
+			starting_indices[pipe_number] = i+1;
+			++pipe_number;
+		}
+	}
+}
+
+
+int has_pipe(char** commands, int size, int vector_of_positions[])
 {
 	int i;
 	int number_of_commands = 0;
-	for(i=0;i<size;i++)
-		if(strcmp(commands[i], "||") == 0){
-			matrix_of_positions[number_of_commands] = (i - 1);
+	for(i=0 ; i<size ; i++)
+	{
+		if(strcmp(commands[i], "|") == 0) {
+			vector_of_positions[number_of_commands] = (i - 1);
 			number_of_commands++;
-		}			
-	matrix_of_positions[number_of_commands] = (size - 1);
+		}
+	}
+
+	vector_of_positions[number_of_commands] = (size - 1);
 	return number_of_commands + 1;
 }
 
-char* get_instruction(int order_of_inst, int matrix_of_positions[], char** commands)
+char* get_instruction(int order_of_inst, int vector_of_positions[], char** commands)
 {
 	int i;
 	char* command = malloc(256 * sizeof(char*));
@@ -26,8 +44,8 @@ char* get_instruction(int order_of_inst, int matrix_of_positions[], char** comma
 	if(order_of_inst == 0)
 		begin_of_comm = 0;
 	else 
-		begin_of_comm = matrix_of_positions[order_of_inst - 1] + 2;
-	end_of_comm = matrix_of_positions[order_of_inst];
+		begin_of_comm = vector_of_positions[order_of_inst - 1] + 2;
+	end_of_comm = vector_of_positions[order_of_inst];
 
 	//printf("Starting...\n");		
 	for(i=begin_of_comm;i<=end_of_comm;i++){
