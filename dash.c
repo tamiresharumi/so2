@@ -189,24 +189,17 @@ void execute_piped_commands(char **commands, int num_commands, int num_pipes, in
 
 int main(void)
 {
-	//variavel para loops de teste
-	int i;
-
 	char *path = getenv("PATH");
 	
 	//variaveis para comandos que o shell implementa
-	int cadastred_comm = 0;
-	char **commands = chargeCommands("commands.txt", &cadastred_comm, INST_SIZE);
+	//int cadastred_comm = 0;
+	//char **commands = chargeCommands("commands.txt", &cadastred_comm, INST_SIZE);
 
 	//variaveis de pipe
-	int pipefd[2];
-	int num_inst;
 	int inst_limits[MAX_PIPE];
 
 	//variaveis x 
 	int num_args = 0;
-	char* find_in_path;
-	pid_t son;
 	char **terminal;
 	char directory[INST_SIZE];
 	char getbuffer[INST_SIZE];
