@@ -90,19 +90,10 @@ int execute_process(const char *process, char * const * program_argv, int wait_f
 
 void execute_piped_commands(char **commands, int num_commands, int num_pipes, int *starting_indices)
 {
-	int *pipefd = malloc(2 * sizeof(int) * num_pipes);
+	int pipefd[2], oldfd[2];
 	int i;
 	int *pids = malloc((num_pipes+1) * sizeof(int));
-
-	//cria todos os pipes
-	for (i=0 ; i<num_pipes ; ++i)
-	{
-		if (pipe(&pipefd[i*2]) == -1)
-		{
-			perror("pipe");
-			return;
-		}
-	}
+	int status;
 
 	//executa os processos 
 	for (i=0 ; i<num_pipes+1 ; ++i)
@@ -121,9 +112,12 @@ void execute_piped_commands(char **commands, int num_commands, int num_pipes, in
 
 		//o (+1) é pra garantir espaço para o '\0' que termina a lista
 		argvp = malloc((narg+1) * sizeof(char*));
-		printf("[%s] : %i\n", process, narg);
 
-		for (j=0 ; j<narg ; ++i)
+#if TEST_DASH_PIPE
+		printf("[%s] : %i\n", process, narg);
+#endif
+
+		for (j=0 ; j<narg ; ++j)
 		{
 			char *current = commands[starting_indices[i]+j];
 			int length = strlen(current) + 1;
@@ -132,24 +126,65 @@ void execute_piped_commands(char **commands, int num_commands, int num_pipes, in
 		}
 		argvp[j] = 0;
 
-		//tem três categorias de processos aqui:
-		//  o primeiro, que só substitui o stdout
-		//  os do meio, que substiuem o stdout E stdin
-		//  o último, que só substitui o stdin
-		if (i == 0)
+#if TEST_DASH_PIPE
+		for (j=0 ; j<=narg ; ++j)
+			printf("\t[%i]: %s\n", j, argvp[j]);
+#endif
+		
+		if (i < num_pipes)
 		{
-			//primeiro
+			pipe(pipefd);
 		}
-		else if (i < num_pipes)
+
+		pids[i] = fork();
+		if (pids[i] == 0)
 		{
-			//do meio
+			//se tem algum comando antes desse, refaz o stdin pro pipe
+			if (i > 0)
+			{
+				dup2(oldfd[0], fileno(stdin));
+				close(oldfd[0]);
+				close(oldfd[1]);
+			}
+			//se tem algum comando depois desse, refaz o stdout pro pipe
+			if (i < num_pipes)
+			{
+				close(pipefd[0]);
+				dup2(pipefd[1], fileno(stdout));
+				close(pipefd[1]);
+			}
+
+			execvp(process, argvp);
+			perror("execvp");
+			_exit(EXIT_FAILURE);
 		}
 		else
 		{
-			//último
+			//se tem comando antes
+			if (i > 0)
+			{
+				close(oldfd[0]);
+				close(oldfd[1]);
+			}
+			//se tem comando depois
+			if (i < num_pipes)
+			{
+				oldfd[0] = pipefd[0];
+				oldfd[1] = pipefd[1];
+			}
 		}
-		
 	}
+
+	//espera o primeiro processo terminar, fecha o pipe e depois espera
+	//todos os processos que ele criou terminarem
+
+	waitpid(pids[0], &status, 0);
+
+	close(oldfd[0]);
+	close(oldfd[1]);
+
+	for (i=1 ; i<num_pipes+1 ; ++i)
+		waitpid(pids[i], &status, 0);
 }
 
 int main(void)
