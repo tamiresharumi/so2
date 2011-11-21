@@ -1,20 +1,27 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "pipes.h"
 #include "dash.h"
 
 int number_of_piped_commands(char **commands, int num_commands, int *starting_indices)
 {
 	int i;
-	int pipe_number = 0;
+	//Isso é pra ter um acesso uniforme, até
+	//o primeiro comando tá incluído aqui
+	int pipe_number = 1;
+	starting_indices[0] = 0;
 
 	for (i=0 ; i<num_commands ; ++i) {
+		printf("commands[%i] : %s\n", i, commands[i]);
 		if (strequal("|", commands[i])) {
 			starting_indices[pipe_number] = i+1;
 			++pipe_number;
 		}
 	}
+
+	return pipe_number - 1;
 }
 
 

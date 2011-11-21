@@ -44,10 +44,10 @@ void cd(char* param)
 enum dash_command
 {
 	DASH_INTERNAL_OK,
-	DASH_NOT_FOUND
+	DASH_INTERNAL_NOT_FOUND
 };
 
-int execute_command(char** command, int *keep_running){
+enum dash_command execute_command(char** command, int *keep_running){
 	
 	if(strcmp(command[0], "exit") == 0){
 		*keep_running = FALSE;
@@ -62,7 +62,8 @@ int execute_command(char** command, int *keep_running){
 		cd(command[1]);
 		return DASH_INTERNAL_OK;
 	}
-	else return 1;
+	else 
+		return DASH_INTERNAL_NOT_FOUND;
 }
 
 int execute_process(const char *process, char * const * program_argv, int wait_for_finish)
@@ -71,7 +72,7 @@ int execute_process(const char *process, char * const * program_argv, int wait_f
 	if (pid == 0)
 	{
 		execvp(process, program_argv);
-		perror("fork error");
+		perror("execvp");
 		_exit(EXIT_FAILURE);
 	}
 	else
@@ -87,6 +88,69 @@ int execute_process(const char *process, char * const * program_argv, int wait_f
 	}
 }
 
+void execute_piped_commands(char **commands, int num_commands, int num_pipes, int *starting_indices)
+{
+	int *pipefd = malloc(2 * sizeof(int) * num_pipes);
+	int i;
+	int *pids = malloc((num_pipes+1) * sizeof(int));
+
+	//cria todos os pipes
+	for (i=0 ; i<num_pipes ; ++i)
+	{
+		if (pipe(&pipefd[i*2]) == -1)
+		{
+			perror("pipe");
+			return;
+		}
+	}
+
+	//executa os processos 
+	for (i=0 ; i<num_pipes+1 ; ++i)
+	{
+		const char *process = commands[starting_indices[i]];
+		char **argvp;
+		int j;
+		//o número de argumentos é do índice atual até o próximo pipe ou
+		//então até o fim da linha de comando, encontrar qual o certo
+		int narg;
+		if (i == num_pipes) {
+			narg = num_commands - starting_indices[i];
+		} else {
+			narg = starting_indices[i+1] - starting_indices[i] - 1;
+		}
+
+		//o (+1) é pra garantir espaço para o '\0' que termina a lista
+		argvp = malloc((narg+1) * sizeof(char*));
+		printf("[%s] : %i\n", process, narg);
+
+		for (j=0 ; j<narg ; ++i)
+		{
+			char *current = commands[starting_indices[i]+j];
+			int length = strlen(current) + 1;
+			argvp[j] = malloc(length * sizeof(char));
+			strncpy(argvp[j], current, length);
+		}
+		argvp[j] = 0;
+
+		//tem três categorias de processos aqui:
+		//  o primeiro, que só substitui o stdout
+		//  os do meio, que substiuem o stdout E stdin
+		//  o último, que só substitui o stdin
+		if (i == 0)
+		{
+			//primeiro
+		}
+		else if (i < num_pipes)
+		{
+			//do meio
+		}
+		else
+		{
+			//último
+		}
+		
+	}
+}
 
 int main(void)
 {
@@ -120,8 +184,8 @@ int main(void)
 		if(fgets(getbuffer, INST_SIZE, stdin) != NULL){
 			
 			if((terminal = tokenize(getbuffer, &num_args)) != 0){
-				int num_commands;
-
+				int num_pipes;
+				enum dash_command internal_result;
 
 				if (strequal(terminal[0], "|"))
 				{
@@ -129,23 +193,37 @@ int main(void)
 					continue;
 				}
 
-				num_commands = number_of_piped_commands(terminal, num_args, inst_limits);
+				num_pipes = number_of_piped_commands(terminal, num_args, inst_limits);
 
-				
-				if(founded(terminal[0], commands, cadastred_comm)){
-					keep_running = execute_command(terminal);
+				if (num_pipes > 0)
+				{
+					execute_piped_commands(terminal, num_args, num_pipes, inst_limits);
 				}
+				else
+				{
+					internal_result = execute_command(terminal, &keep_running);
+					if (internal_result == DASH_INTERNAL_NOT_FOUND)
+					{
+						//não é comando interno do meu shell fofinho, executar do sistema
+						//depois de checar que ele existe
 
-				else if((find_in_path = seek_command(terminal[0], path)) != NULL){
-					execute_process(terminal[0], terminal, TRUE);
+						if (seek_command(terminal[0], path))
+						{
+							execute_process(terminal[0], terminal, TRUE);
+						}
+						else
+						{
+							printf("Comando %s nao encontrado!\n", terminal[0]);
+						}
+					}
 				}
-				else printf("Comando %s nao encontrado!\n", terminal[0]);
 			}
 		}
-		else if(feof(stdin)){
+		else if(feof(stdin)) {
 			printf("\n");			
 			keep_running = 0;
 		}
 	}
 	return EXIT_SUCCESS;
 }
+
