@@ -1,0 +1,26 @@
+Instructions for the Shell Project
+
+What to do
+
+Write a shell with the following functionality
+
+Execution of build-in commands (at least: exit, help, jobs, fg, bg,; but you will find interesting to implement also 'cd', 'pwd' etc.)
+Execution of external commands via exec syscall (in foreground and background)
+Redirection of input and output (<, >, >>)
+Pipes (unlimited sequential pipes, p.ex. cmd1 | cmd2 | cmd3....)
+Job control (suspend jobs, put in background, foreground etc.)
+
+Provide a Makefile
+
+Rules
+Use exclusively the libc, and nothing else,
+o, not even readline lib; if you want to implement history functionality (congratulations), make it yourself.
+yes, you can use POSIX semaphores
+Use gcc as the compiler
+Of course, the shell must be for linux
+
+Notes
+Your software must compiple with gcc -Wall and withotut -D_GNU_SOURCE
+Your software must compile and run without warnings or errors
+Tips
+Check all your system calls: ex. pid = fork(); if (pid<0)...
