@@ -10,13 +10,14 @@ struct redirection
 struct process
 {
 	char **argv;
-	pid_t pid;
+	int pid;
 	int finished;
 	int stopped;
 	int status;
 
 	struct redirection *redirections;
 	int num_redirections;
+	
 };
 
 struct job

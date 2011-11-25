@@ -137,6 +137,7 @@ void execute_piped_commands(char **commands, int num_commands, int num_pipes, in
 		}
 
 		pids[i] = fork();
+		//se o processo for filho
 		if (pids[i] == 0)
 		{
 			//se tem algum comando antes desse, refaz o stdin pro pipe
