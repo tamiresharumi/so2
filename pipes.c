@@ -17,7 +17,7 @@ int number_of_piped_commands(char **commands, int num_commands, int *starting_in
 #if TEST_DASH_PIPE
 		printf("commands[%i] : %s\n", i, commands[i]);
 #endif
-			if ((strequal("|", commands[i]))&&(i == num_commands)) {
+		if (strequal("|", commands[i])) {
 			starting_indices[pipe_number] = i+1;
 			++pipe_number;
 		}
