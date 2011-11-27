@@ -95,7 +95,6 @@ void execute_job(struct job *job)
 	struct process *first_process = job->processes;
 	int pipefd[2], oldfd[2];
 
-
 	for (p=job->processes ; p ; p=p->next)
 	{
 		//se tem outro processo mais pra frente
@@ -161,6 +160,8 @@ void execute_job(struct job *job)
 		else
 		{
 			//pai
+			p->pid = pid;
+			p->
 			
 			//se tem algum processo antes do que foi aberto agora, fecha as
 			//cópias que o pai tem dos descritores de arquivo pra não ficar com
@@ -182,106 +183,11 @@ void execute_job(struct job *job)
 		}
 	}
 
-}
-
-void execute_piped_commands(char **commands, int num_commands, int num_pipes, int *starting_indices)
-{
-	int pipefd[2], oldfd[2];
-	int i;
-	int *pids = malloc((num_pipes+1) * sizeof(int));
-	int status;
-
-	//executa os processos 
-	for (i=0 ; i<num_pipes+1 ; ++i)
-	{
-		const char *process = commands[starting_indices[i]];
-		char **argvp;
-		int j;
-		//o número de argumentos é do índice atual até o próximo pipe ou
-		//então até o fim da linha de comando, encontrar qual o certo
-		int narg;
-		if (i == num_pipes) {
-			narg = num_commands - starting_indices[i];
-		} else {
-			narg = starting_indices[i+1] - starting_indices[i] - 1;
-		}
-
-		//o (+1) é pra garantir espaço para o '\0' que termina a lista
-		argvp = malloc((narg+1) * sizeof(char*));
-
-#if TEST_DASH_PIPE
-		printf("[%s] : %i\n", process, narg);
-#endif
-
-		for (j=0 ; j<narg ; ++j)
-		{
-			char *current = commands[starting_indices[i]+j];
-			int length = strlen(current) + 1;
-			argvp[j] = malloc(length * sizeof(char));
-			strncpy(argvp[j], current, length);
-		}
-		argvp[j] = 0;
-
-#if TEST_DASH_PIPE
-		for (j=0 ; j<=narg ; ++j)
-			printf("\t[%i]: %s\n", j, argvp[j]);
-#endif
-		
-		if (i < num_pipes)
-		{
-			pipe(pipefd);
-		}
-
-		pids[i] = fork();
-		//se o processo for filho
-		if (pids[i] == 0)
-		{
-			//se tem algum comando antes desse, refaz o stdin pro pipe
-			if (i > 0)
-			{
-				dup2(oldfd[0], fileno(stdin));
-				close(oldfd[0]);
-				close(oldfd[1]);
-			}
-			//se tem algum comando depois desse, refaz o stdout pro pipe
-			if (i < num_pipes)
-			{
-				close(pipefd[0]);
-				dup2(pipefd[1], fileno(stdout));
-				close(pipefd[1]);
-			}
-
-			execvp(process, argvp);
-			perror("execvp");
-			_exit(EXIT_FAILURE);
-		}
-		else
-		{
-			//se tem comando antes
-			if (i > 0)
-			{
-				close(oldfd[0]);
-				close(oldfd[1]);
-			}
-			//se tem comando depois
-			if (i < num_pipes)
-			{
-				oldfd[0] = pipefd[0];
-				oldfd[1] = pipefd[1];
-			}
-		}
-	}
-
-	//espera o primeiro processo terminar, fecha o pipe e depois espera
-	//todos os processos que ele criou terminarem
-
-	waitpid(pids[0], &status, 0);
-
+	//fecha as pontas do pipe que ainda precisava
 	close(oldfd[0]);
 	close(oldfd[1]);
 
-	for (i=1 ; i<num_pipes+1 ; ++i)
-		waitpid(pids[i], &status, 0);
+	//terminou! aqui era só pra executar. esperar ou não é problema do shell ;)
 }
 
 int main(void)
