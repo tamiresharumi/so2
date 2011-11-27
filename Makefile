@@ -13,7 +13,7 @@ $(OBJDIR)/%.o: %.c
 $(OBJS): | $(OBJDIR)
 
 $(OBJDIR):
-	mkdir $(OBJDIR)
+	mkdir -p $(OBJDIR)
 
 clear:	
 	rm -f $(OBJDIR)/*.o

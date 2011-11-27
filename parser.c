@@ -52,6 +52,7 @@ regmatch_t* regex_match(const char *input, const char *pattern)
 
 char** get_next_token(char **next_token)
 {
+	
 	return ++next_token;
 }
 
@@ -92,17 +93,17 @@ void parse_error()
 	*c = 42;
 };
 
-int parse_redirect(char **next_token, struct process *process)
+int parse_redirect(char ***next_token, struct process *process)
 {
 	struct redirection redirect;
 	struct redirection **next = 0;
 
-	regmatch_t *match = regex_match(*next_token,
+	regmatch_t *match = regex_match(**next_token,
 		"^([[:digit:]]+)?(>|>>|<|>&)(.*)?"
 	);
 	if (match)
 	{
-		char *operator = copy_match(next_token, match[2]);
+		char *operator = copy_match(*next_token, match[2]);
 
 		if (strequal(operator, ">"))
 		{
@@ -112,22 +113,22 @@ int parse_redirect(char **next_token, struct process *process)
 			if (empty_match(match[1]))
 				redirect.src = strdup("1");
 			else
-				redirect.src = copy_match(next_token, match[1]);
+				redirect.src = copy_match(*next_token, match[1]);
 
 			redirect.dest_type = REDIRECTION_FILE;
 			//levar em conta que o arquivo pra onde vai redirecionar pode estar
 			//no token seguinte
 			if (empty_match(match[3]))
 			{
-				next_token = get_next_token(next_token);
-				if (*next_token == 0)
+				*next_token = get_next_token(*next_token);
+				if (**next_token == 0)
 					parse_error();
 
-				redirect.dest = strdup(*next_token);
+				redirect.dest = strdup(**next_token);
 			}
 			else
 			{
-				redirect.dest = copy_match(next_token, match[3]);
+				redirect.dest = copy_match(*next_token, match[3]);
 			}
 		}
 		else if (strequal(operator, ">>"))
@@ -138,21 +139,21 @@ int parse_redirect(char **next_token, struct process *process)
 			if (empty_match(match[1]))	
 				redirect.src = strdup("1");
 			else
-				redirect.src = copy_match(next_token, match[1]);
+				redirect.src = copy_match(*next_token, match[1]);
 
 			redirect.dest_type = REDIRECTION_FILE;
 			//levar em conta que o destino pode estar no próximo token
 			if (empty_match(match[3]))
 			{
-				next_token = get_next_token(next_token);
-				if (*next_token == 0)
+				*next_token = get_next_token(*next_token);
+				if (**next_token == 0)
 					parse_error();
 
-				redirect.dest = strdup(*next_token);
+				redirect.dest = strdup(**next_token);
 			}
 			else
 			{
-				redirect.dest = copy_match(next_token, match[3]);
+				redirect.dest = copy_match(*next_token, match[3]);
 			}
 		}
 		else if (strequal(operator, "<"))
@@ -163,21 +164,21 @@ int parse_redirect(char **next_token, struct process *process)
 			if (empty_match(match[1]))
 				redirect.dest = strdup("0");
 			else
-				redirect.dest = copy_match(next_token, match[1]);
+				redirect.dest = copy_match(*next_token, match[1]);
 
 			redirect.src_type = REDIRECTION_FILE;
 			//leva em conta que pode estar no próximo token
 			if (empty_match(match[3]))
 			{
-				next_token = get_next_token(next_token);
-				if (*next_token == 0)
+				*next_token = get_next_token(*next_token);
+				if (**next_token == 0)
 					parse_error();
 
-				redirect.src = strdup(*next_token);
+				redirect.src = strdup(**next_token);
 			}
 			else
 			{
-				redirect.src = copy_match(next_token, match[3]);
+				redirect.src = copy_match(*next_token, match[3]);
 			}
 		}
 		else if (strequal(operator, ">&"))
@@ -188,20 +189,20 @@ int parse_redirect(char **next_token, struct process *process)
 			if (empty_match(match[1]))
 				redirect.src = strdup("1");
 			else
-				redirect.src = copy_match(next_token, match[1]);
+				redirect.src = copy_match(*next_token, match[1]);
 
 			//leva em conta que o destino pode estar no próximo token
 			if (empty_match(match[3]))
 			{
-				next_token = get_next_token(next_token);
-				if (*next_token == 0)
+				*next_token = get_next_token(*next_token);
+				if (**next_token == 0)
 					parse_error();
 
-				redirect.dest = strdup(*next_token);
+				redirect.dest = strdup(**next_token);
 			}
 			else
 			{
-				redirect.dest = copy_match(next_token, match[3]);
+				redirect.dest = copy_match(*next_token, match[3]);
 			}
 
 			//verifica se é um número pra tratar como descritor de arquivo
@@ -230,7 +231,7 @@ int parse_redirect(char **next_token, struct process *process)
 	*next = malloc(sizeof(struct redirection));
 	memcpy(*next, &redirect, sizeof(struct redirection));
 
-	next_token = get_next_token(next_token);
+	*next_token = get_next_token(*next_token);
 	return TRUE;
 }
 
@@ -240,43 +241,45 @@ int count_args(char **argv)
 	int number_args = 0;
 	char **s;
 
+	assert(argv != 0);
+
 	for (s=argv ; *s!= 0 ; ++s)
 		++number_args;
 
 	return number_args;
 }
 
-int parse_word(char **next_token, struct process *process)
+int parse_word(char ***next_token, struct process *process)
 {
 	int num_args = count_args(process->argv);
 
-	if (*next_token == 0         ||
-		strstr(*next_token, "|") ||
-		strstr(*next_token, "&"))
+	if (**next_token == 0         ||
+		strstr(**next_token, "|") ||
+		strstr(**next_token, "&"))
 	{
 		parse_error();
 	}
 
 	//adiciona +2 porque é um pro novo item e um pro '\0'
 	process->argv = realloc(process->argv, (num_args + 2) * sizeof(char*));
-	process->argv[num_args] = strdup(*next_token);
+	process->argv[num_args] = strdup(**next_token);
 	process->argv[num_args+1] = 0;
 
-	next_token = get_next_token(next_token);
+	*next_token = get_next_token(*next_token);
 	return TRUE;
 }
 
-int parse_command(char **next_token, struct process *process)
+int parse_command(char ***next_token, struct process *process)
 {
 	//verifica se o next_token é algum destes símbolos, porque se for é um
 	//erro na linha de comando
-	if (strpbrk(*next_token, "|&><"))
+	if (strpbrk(**next_token, "|&><"))
 	{
-		fprintf(stderr, "Expected <command>, got %s\n", *next_token);
+		fprintf(stderr, "Expected <command>, got %s\n", **next_token);
 		parse_error();
 	}
 
-	while (*next_token && !strequal(*next_token, "|") && !strequal(*next_token, "&"))
+	while (**next_token && !strequal(**next_token, "|") && !strequal(**next_token, "&"))
 	{
 		if (!parse_redirect(next_token, process))
 		{
@@ -287,7 +290,7 @@ int parse_command(char **next_token, struct process *process)
 		}
 	}
 
-	next_token = get_next_token(next_token);
+	//*next_token = get_next_token(*next_token);
 	return TRUE;
 }
 
@@ -303,7 +306,8 @@ struct process* new_process(struct job *job)
 
 	newp = *next;
 	newp->next = 0;
-	newp->argv = 0;
+	newp->argv = malloc(sizeof(char*));
+	newp->argv[0] = 0;
 	newp->background = FALSE;
 	newp->finished = FALSE;
 	newp->pid = 0;
@@ -314,12 +318,12 @@ struct process* new_process(struct job *job)
 	return *next;
 }
 
-int parse_ampersand(char **next_token, struct process *process)
+int parse_ampersand(char ***next_token, struct process *process)
 {
-	if (strequal(*next_token, "&"))
+	if (**next_token && strequal(**next_token, "&"))
 	{
 		process->background = TRUE;
-		next_token = get_next_token(next_token);
+		*next_token = get_next_token(*next_token);
 	}
 
 	return TRUE;
@@ -327,17 +331,17 @@ int parse_ampersand(char **next_token, struct process *process)
 
 int parse_start(char **command, struct job *job)
 {
-	char **next_token = command;
+	char ***next_token = &command;
 
-	if (*next_token != 0)
+	if (**next_token != 0)
 	{
 		struct process *process = new_process(job);
 		if (!parse_command(next_token, process))
 			return FALSE;
 
-		while (strequal(*next_token, "|"))
+		while (**next_token && strequal(**next_token, "|"))
 		{
-			next_token = get_next_token(next_token);
+			*next_token = get_next_token(*next_token);
 			if (!parse_command(next_token, process))
 				return FALSE;
 		}

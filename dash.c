@@ -1,12 +1,13 @@
+#include "dash.h"
+#include "parser.h"
+#include "pipes.h"
+#include "supportedcommands.h"
+#include "tokens.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/wait.h>
-#include"supportedcommands.h"
-#include "tokens.h"
-#include "pipes.h"
-#include "dash.h"
+#include <unistd.h>
 
 #define PROMPT " $ "
 #define INST_SIZE 256
@@ -215,12 +216,15 @@ int main(void)
 			if((terminal = tokenize(getbuffer, &num_args)) != 0){
 				int num_pipes;
 				enum dash_command internal_result;
+				struct job *job;
 
 				if (strequal(terminal[0], "|"))
 				{
 					printf("Caracter inesperado '|'\n");
 					continue;
 				}
+				
+				job = build_job(terminal);
 
 				num_pipes = number_of_piped_commands(terminal, num_args, inst_limits);
 
