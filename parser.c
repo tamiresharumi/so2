@@ -1,6 +1,7 @@
 #include "parser.h"
 #include "dash.h"
 #include <assert.h>
+#include <setjmp.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -8,11 +9,23 @@
 //isso faz parte da libc, legal, né?
 #include <regex.h>
 
+//feio usar uma variável global.. Mas é pra recuperar do
+//estrago que uma linha de comando mal feita pode fazer.
+//até que vale a pena aqui pra não ter que refazer todo
+//o parser
+jmp_buf parse_environment;
+
+enum parse_result
+{
+	PARSE_OK=0,
+	PARSE_FAIL
+};
+
 /*
 	Essa é a 'gramática' do shell
 
 	inicio =
-		?(comando ( '|' comando)* ?background)
+		(comando ( '|' comando)* background?)?
 	comando =
 		(palavra | redirection)+
 */
@@ -59,8 +72,8 @@ char** get_next_token(char **next_token)
 char* copy_match(char **next_token, const regmatch_t match)
 {
 	char *copy = strndup(
-		*next_token + match.rm_so,		// onde a string começa
-		match.rm_eo - match.rm_so + 1	// tamanho da string
+		*next_token + match.rm_so,	// onde a string começa
+		match.rm_eo - match.rm_so	// tamanho da string
 	);
 	return copy;
 }
@@ -89,8 +102,7 @@ int is_number(const char *input)
 
 void parse_error()
 {
-	char *c = 0;
-	*c = 42;
+	longjmp(parse_environment, PARSE_FAIL);
 };
 
 int parse_redirect(char ***next_token, struct process *process)
@@ -273,7 +285,7 @@ int parse_command(char ***next_token, struct process *process)
 {
 	//verifica se o next_token é algum destes símbolos, porque se for é um
 	//erro na linha de comando
-	if (strpbrk(**next_token, "|&><"))
+	if (**next_token && strpbrk(**next_token, "|&><"))
 	{
 		fprintf(stderr, "Expected <command>, got %s\n", **next_token);
 		parse_error();
@@ -359,12 +371,42 @@ int parse_start(char **command, struct job *job)
 	return TRUE;
 }
 
+void free_job(struct job *job)
+{
+	struct process *p;
+
+	for (p=job->processes ; p ; p = p->next)
+	{
+		struct redirection *r;
+		for (r=p->redirections ; r ; r = r->next)
+		{
+			
+		}
+	}
+}
+
 struct job* build_job(char **commands)
 {
+	int parse_result;
+
 	struct job* new_job = malloc(sizeof(struct job));
 	new_job->processes = 0;
 
-	parse_start(commands, new_job);
+	parse_result = setjmp(parse_environment);
+
+	if (parse_result == PARSE_OK)
+		parse_start(commands, new_job);
+	else if (parse_result == PARSE_FAIL)
+	{
+		//ih, deu algo errado!
+		free_job(new_job);
+		free(new_job);
+		return 0;
+	}
+	else
+	{
+		perror("setjmp");
+	}
 
 	return new_job;
 }
