@@ -89,6 +89,101 @@ int execute_process(const char *process, char * const * program_argv, int wait_f
 	}
 }
 
+void execute_job(struct job *job)
+{
+	struct process *p;
+	struct process *first_process = job->processes;
+	int pipefd[2], oldfd[2];
+
+
+	for (p=job->processes ; p ; p=p->next)
+	{
+		//se tem outro processo mais pra frente
+		//nesse job, cria o pipe
+		if (p->next)
+		{
+			if (pipe(pipefd) == -1)
+			{
+				perror("pipe");
+				return;
+			}
+		}
+
+		pid_t pid = fork();
+		if (pid == -1)
+		{
+			perror("fork");
+		}
+		else if (pid == 0)
+		{
+			//filho
+			handle_redirects(p->redirections);
+
+			//se tem algum processo antes desse aqui, então tem que fazer o
+			//stdin desse processo ler do pipe
+			if (p != first_process)
+			{
+				//duplica o oldfd[0], que é a saída do pipe, pra ficar sobre o
+				//stdin do processo que tá chamando essa função, ou seja, daqui
+				//pra frente o stdin desse processo passa a ser uma cópia do
+				//oldfd[0]
+				dup2(oldfd[0], fileno(stdin));
+				//como fez uma cópia do oldfd[0] aí em cima, precisa fechar uma
+				//das cópias desse descritor de arquivo pra não ficar com
+				//referências a mais pra esse arquivo. Tem que fechar todos os
+				//descritores de arquivo que foram abertos e não vão ser
+				//fechados automaticamente pelo processo, e isso inclui as
+				//cópias. Como depois do fork esse filho aqui ficou com uma
+				//cópia do descritor do pipe, precisa fechar a parte do pipe
+				//que ele não usa também
+				close(oldfd[0]);
+				close(oldfd[1]);
+			}
+
+			//se tem algum processo depois desse, tem que fazer o stdout desse
+			//processo aqui apontar pra entrada do próximo pipe
+			if (p->next)
+			{
+				//fecha a ponta do pipe que não vai usar nesse processo
+				close(pipefd[0]);
+				//faz stdout desse processo ser uma cópia do pipefd[1] (entrada
+				//do pipe)
+				dup2(pipefd[1], fileno(stdout));
+				//fecha uma cópia do descritor de arquivo pra não ficar com
+				//referências a mais pra ele
+				close(pipefd[1]);
+			}
+
+			execvp(p->argv[0], p->argv);
+			perror("execvp");
+			exit(EXIT_FAILURE);
+		}
+		else
+		{
+			//pai
+			
+			//se tem algum processo antes do que foi aberto agora, fecha as
+			//cópias que o pai tem dos descritores de arquivo pra não ficar com
+			//referências extras, pra que o arquivo possa ser fechado
+			//corretamente
+			if (p != first_process)
+			{
+				close(oldfd[0]);
+				close(oldfd[1]);
+			}
+
+			//se tem algum comando depois, guarda o novo pipe pra poder ser
+			//acessado pelos próximos da sequência
+			if (p->next)
+			{
+				oldfd[0] = pipefd[0];
+				oldfd[1] = pipefd[1];
+			}
+		}
+	}
+
+}
+
 void execute_piped_commands(char **commands, int num_commands, int num_pipes, int *starting_indices)
 {
 	int pipefd[2], oldfd[2];
