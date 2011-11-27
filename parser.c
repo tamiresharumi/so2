@@ -99,7 +99,7 @@ int parse_redirect(char ***next_token, struct process *process)
 	struct redirection **next = 0;
 
 	regmatch_t *match = regex_match(**next_token,
-		"^([[:digit:]]+)?(>|>>|<|>&)(.+)?"
+		"^([[:digit:]]+)?(>&|>>|>|<)(.+)?"
 	);
 	if (match)
 	{
