@@ -1,11 +1,20 @@
-all: 	clear compile run
+OBJDIR = obj
+OBJS = $(addprefix $(OBJDIR)/, dash.o parser.o pipes.o supportedcommands.o tokens.o)
+DASH = dash
+
+all: $(DASH)
+
+$(DASH) : $(OBJS)
+	gcc $(OBJS) -o $(DASH)
+
+$(OBJDIR)/%.o: %.c
+	gcc -c -g3 -Wall -Wextra $< -o $@
+
+$(OBJS): | $(OBJDIR)
+
+$(OBJDIR):
+	mkdir $(OBJDIR)
 
 clear:	
-	rm -f *.o
-
-compile:	
-	gcc -g3 -o dash -Wall -Wextra dash.c parser.c supportedcommands.c tokens.c pipes.c
-
-run:
-	./dash 
+	rm -f $(OBJDIR)/*.o
 
