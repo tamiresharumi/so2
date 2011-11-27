@@ -218,7 +218,7 @@ int main(void)
 
 				if (strequal(terminal[0], "|"))
 				{
-					printf("Caracter inseperado '|'\n");
+					printf("Caracter inesperado '|'\n");
 					continue;
 				}
 
