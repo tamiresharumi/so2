@@ -99,7 +99,7 @@ int parse_redirect(char ***next_token, struct process *process)
 	struct redirection **next = 0;
 
 	regmatch_t *match = regex_match(**next_token,
-		"^([[:digit:]]+)?(>|>>|<|>&)(.*)?"
+		"^([[:digit:]]+)?(>|>>|<|>&)(.+)?"
 	);
 	if (match)
 	{
@@ -298,9 +298,12 @@ struct process* new_process(struct job *job)
 {
 	struct process **next = &job->processes;
 	struct process *newp;
+	struct process *old = job->processes;
 
 	while (*next)
 		next = &(*next)->next;
+	while (old && old->next)
+		old = old->next;
 	
 	*next = malloc(sizeof(struct process));
 
@@ -314,6 +317,9 @@ struct process* new_process(struct job *job)
 	newp->redirections = 0;
 	newp->status = 0;
 	newp->stopped = FALSE;
+
+	if (old)
+		old->next = newp;
 
 	return *next;
 }
@@ -341,6 +347,7 @@ int parse_start(char **command, struct job *job)
 
 		while (**next_token && strequal(**next_token, "|"))
 		{
+			struct process *process = new_process(job);
 			*next_token = get_next_token(*next_token);
 			if (!parse_command(next_token, process))
 				return FALSE;

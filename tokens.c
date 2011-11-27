@@ -36,7 +36,7 @@ char** tokenize(char *msg, int* return_number_of_parameters){
 	}
 	*return_number_of_parameters = i;
 	
-	returned = (char**)malloc(sizeof(char*) * i);
+	returned = (char**)malloc(sizeof(char*) * (i+1));
 	i = 0;
 	strcpy(buffer, msg);
 	result = strtok(buffer, delim);
@@ -49,5 +49,9 @@ char** tokenize(char *msg, int* return_number_of_parameters){
 	}
 	if (i == 0)
 		return 0;
-	else return returned;
+	else
+	{
+		returned[i] = 0;
+		return returned;
+	}
 }
