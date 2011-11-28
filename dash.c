@@ -196,6 +196,43 @@ void dash_help(const char *help)
 				"Show the current jobs run by the shell and associated jobspecs\n"
 			);
 		}
+		else if (strequal(help, "redirections"))
+		{
+			printf(
+				"redirections\n\n\t"
+				"Allows to redirect streams to files or other streams.\n"
+				"\n\tInput redirection:\n\t\t[n]<m\n"
+				"\t\tRedirects file 'm' into input file descriptor n (default 0)\n"
+				"\n\tOutput redirection:\n"
+				"\t\t[n]>m\n"
+				"\t\tRedirects output file descriptor n (default 1) to file m\n"
+				"\t\t[n]>>m\n"
+				"\t\tRedirects output file descriptor n (default 1) to file m, appending to it\n"
+				"\t\t[n]>&m\n"
+				"\t\tRedirects output file descriptor n (default 1) to file descriptor m, or to file m\n"
+				"\n\tRedirections can appear anywhere on the command line:\n"
+				"\n\t\tcat 2>&1 somefile\n"
+			);
+		}
+		else if (strequal(help, "pipes"))
+		{
+			printf(
+				"pipes\n\n\t"
+				"Allows piping between two programs, connecting the stdout of"
+				"\n\tthe first process to the stdin of the second\n\n\t"
+				"command1 | command2 | command3 | ...\n"
+			);
+		}
+		else if (strequal(help, "background"))
+		{
+			printf(
+				"background\n\n\t"
+				"Allows to start a process in the background by appending a\n\t"
+				"ampersand to the end of the command line\n"
+				"\n\tAlready running process can also be stopped using\n\t"
+				"CTRL-Z and then sent to background using 'bg'\n"
+			);
+		}
 		else
 		{
 			printf("Unknown dash internal command: '%s'\n", help);
@@ -214,6 +251,9 @@ void dash_help(const char *help)
 		printf("fg <jobspec>\n");
 		printf("help\n");
 		printf("jobs\n");
+		printf("\nredirections:\n\t[n]>m\n\t[n]>>m\n\t[n]<m\n\t[n]>&m\n");
+		printf("\npipes:\n\ta | b\n");
+		printf("\nbackground:\n\t command &\n");
 	}
 }
 
