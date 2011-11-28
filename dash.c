@@ -121,6 +121,7 @@ void handle_redirects(struct redirection *redirect)
 		}
 
 		//duplica o descritor de arquivo pra fazer o redirecionamento
+		printf("dest_fd, src_fd: %i %i\n", dest_fd, src_fd);
 		if (dup2(dest_fd, src_fd) == -1)
 		{
 			perror("dup2");
@@ -155,7 +156,6 @@ void execute_job(struct job *job)
 		else if (pid == 0)
 		{
 			//filho
-			handle_redirects(p->redirections);
 
 			//se tem algum processo antes desse aqui, então tem que fazer o
 			//stdin desse processo ler do pipe
@@ -191,6 +191,8 @@ void execute_job(struct job *job)
 				//referências a mais pra ele
 				close(pipefd[1]);
 			}
+
+			handle_redirects(p->redirections);
 
 			execvp(p->argv[0], p->argv);
 			perror("execvp");
