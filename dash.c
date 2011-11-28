@@ -199,6 +199,7 @@ void dash_help(const char *help)
 		else
 		{
 			printf("Unknown dash internal command: '%s'\n", help);
+			printf("Maybe try 'man %s' or 'info %s'?\n", help, help);
 		}
 	}
 	else
