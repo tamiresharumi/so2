@@ -170,15 +170,15 @@ int parse_redirect(char ***next_token, struct process *process)
 		}
 		else if (strequal(operator, "<"))
 		{
-			redirect.mode = REDIRECTION_SIMPLE;
+			redirect.mode = REDIRECTION_INPUT;
 
-			redirect.dest_type = REDIRECTION_FD;
+			redirect.src_type = REDIRECTION_FD;
 			if (empty_match(match[1]))
-				redirect.dest = strdup("0");
+				redirect.src = strdup("0");
 			else
-				redirect.dest = copy_match(*next_token, match[1]);
+				redirect.src = copy_match(*next_token, match[1]);
 
-			redirect.src_type = REDIRECTION_FILE;
+			redirect.dest_type = REDIRECTION_FILE;
 			//leva em conta que pode estar no próximo token
 			if (empty_match(match[3]))
 			{
@@ -186,11 +186,11 @@ int parse_redirect(char ***next_token, struct process *process)
 				if (**next_token == 0)
 					parse_error();
 
-				redirect.src = strdup(**next_token);
+				redirect.dest = strdup(**next_token);
 			}
 			else
 			{
-				redirect.src = copy_match(*next_token, match[3]);
+				redirect.dest = copy_match(*next_token, match[3]);
 			}
 		}
 		else if (strequal(operator, ">&"))

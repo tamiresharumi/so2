@@ -109,10 +109,10 @@ void handle_redirects(struct redirection *redirect)
 
 			if (redirect->mode == REDIRECTION_APPEND)
 				dest_file = fopen(redirect->dest, "a");
-				//dest_fd = open(redirect->dest, O_WRONLY|O_CREAT|O_TRUNC|O_APPEND, 0x644);
-			else
+			else if (redirect->mode == REDIRECTION_SIMPLE)
 				dest_file = fopen(redirect->dest, "w");
-				//dest_fd = open(redirect->dest, O_WRONLY|O_CREAT|O_TRUNC, 0x644);
+			else
+				dest_file = fopen(redirect->dest, "r");
 			dest_fd = fileno(dest_file);
 		}
 		else
@@ -125,7 +125,6 @@ void handle_redirects(struct redirection *redirect)
 		{
 			perror("dup2");
 		}
-		perror("dup2 do filho");
 	}
 }
 

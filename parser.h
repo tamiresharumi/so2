@@ -10,7 +10,8 @@ enum redirection_type
 enum redirection_mode
 {
 	REDIRECTION_SIMPLE,
-	REDIRECTION_APPEND
+	REDIRECTION_APPEND,
+	REDIRECTION_INPUT
 };
 
 struct redirection
