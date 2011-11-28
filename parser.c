@@ -323,12 +323,10 @@ struct process* new_process(struct job *job)
 	newp->next = 0;
 	newp->argv = malloc(sizeof(char*));
 	newp->argv[0] = 0;
-	newp->background = FALSE;
 	newp->finished = FALSE;
 	newp->pid = 0;
 	newp->redirections = 0;
 	newp->status = 0;
-	newp->stopped = FALSE;
 
 	if (old)
 		old->next = newp;
@@ -336,11 +334,11 @@ struct process* new_process(struct job *job)
 	return *next;
 }
 
-int parse_ampersand(char ***next_token, struct process *process)
+int parse_ampersand(char ***next_token, struct job *job)
 {
 	if (**next_token && strequal(**next_token, "&"))
 	{
-		process->background = TRUE;
+		job->background = TRUE;
 		*next_token = get_next_token(*next_token);
 	}
 
@@ -365,7 +363,7 @@ int parse_start(char **command, struct job *job)
 				return FALSE;
 		}
 
-		parse_ampersand(next_token, process);
+		parse_ampersand(next_token, job);
 	}
 
 	return TRUE;
@@ -391,6 +389,7 @@ struct job* build_job(char **commands)
 
 	struct job* new_job = malloc(sizeof(struct job));
 	new_job->processes = 0;
+	new_job->background = FALSE;
 
 	parse_result = setjmp(parse_environment);
 

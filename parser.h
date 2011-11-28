@@ -30,9 +30,7 @@ struct process
 	char **argv;
 	int pid;
 	int finished;
-	int stopped;
 	int status;
-	int background;
 
 	struct redirection *redirections;
 };
@@ -40,6 +38,7 @@ struct process
 struct job
 {
 	struct process *processes;
+	int background;
 };
 
 struct job* build_job(char **commands);

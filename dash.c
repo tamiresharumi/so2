@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 #include <unistd.h>
 
 #define PROMPT " $ "
@@ -89,6 +90,45 @@ int execute_process(const char *process, char * const * program_argv, int wait_f
 	}
 }
 
+void handle_redirects(struct redirection *redirect)
+{
+	for (/**/ ; redirect ; redirect = redirect->next)
+	{
+		int src_fd, dest_fd;
+
+		//encontra o descritor de arquivo da origem
+		if (redirect->src_type == REDIRECTION_FILE)
+			src_fd = open(redirect->src, O_RDONLY);
+		else
+			src_fd = atoi(redirect->src);
+
+		//encontra o descritor de arquivo do destino
+		if (redirect->dest_type == REDIRECTION_FILE)
+		{
+			FILE *dest_file;
+
+			if (redirect->mode == REDIRECTION_APPEND)
+				dest_file = fopen(redirect->dest, "a");
+				//dest_fd = open(redirect->dest, O_WRONLY|O_CREAT|O_TRUNC|O_APPEND, 0x644);
+			else
+				dest_file = fopen(redirect->dest, "w");
+				//dest_fd = open(redirect->dest, O_WRONLY|O_CREAT|O_TRUNC, 0x644);
+			dest_fd = fileno(dest_file);
+		}
+		else
+		{
+			dest_fd = atoi(redirect->dest);
+		}
+
+		//duplica o descritor de arquivo pra fazer o redirecionamento
+		if (dup2(dest_fd, src_fd) == -1)
+		{
+			perror("dup2");
+		}
+		perror("dup2 do filho");
+	}
+}
+
 void execute_job(struct job *job)
 {
 	struct process *p;
@@ -161,7 +201,6 @@ void execute_job(struct job *job)
 		{
 			//pai
 			p->pid = pid;
-			p->
 			
 			//se tem algum processo antes do que foi aberto agora, fecha as
 			//cópias que o pai tem dos descritores de arquivo pra não ficar com
@@ -183,11 +222,23 @@ void execute_job(struct job *job)
 		}
 	}
 
-	//fecha as pontas do pipe que ainda precisava
-	close(oldfd[0]);
-	close(oldfd[1]);
+	//fecha as pontas do pipe que ainda precisava se eles tiverem sido criados
+	if (first_process->next)
+	{
+		close(oldfd[0]);
+		close(oldfd[1]);
+	}
 
 	//terminou! aqui era só pra executar. esperar ou não é problema do shell ;)
+}
+
+void wait_job(struct job *job)
+{
+	struct process *p;
+	int status;
+
+	for (p=job->processes ; p ; p=p->next)
+		waitpid(p->pid, &status, 0);
 }
 
 int main(void)
@@ -197,9 +248,6 @@ int main(void)
 	//variaveis para comandos que o shell implementa
 	//int cadastred_comm = 0;
 	//char **commands = chargeCommands("commands.txt", &cadastred_comm, INST_SIZE);
-
-	//variaveis de pipe
-	int inst_limits[MAX_PIPE];
 
 	//variaveis x 
 	int num_args = 0;
@@ -215,7 +263,6 @@ int main(void)
 		if(fgets(getbuffer, INST_SIZE, stdin) != NULL){
 			
 			if((terminal = tokenize(getbuffer, &num_args)) != 0){
-				int num_pipes;
 				enum dash_command internal_result;
 				struct job *job;
 
@@ -226,12 +273,11 @@ int main(void)
 				}
 				
 				job = build_job(terminal);
-
-				num_pipes = number_of_piped_commands(terminal, num_args, inst_limits);
-
-				if (num_pipes > 0)
+				
+				if (job->processes && job->processes->next)
 				{
-					execute_piped_commands(terminal, num_args, num_pipes, inst_limits);
+					//tem mais que um processo na história, ou seja: pipes!
+					execute_job(job);
 				}
 				else
 				{
@@ -241,16 +287,32 @@ int main(void)
 						//não é comando interno do meu shell fofinho, executar do sistema
 						//depois de checar que ele existe
 
-						if (seek_command(terminal[0], path))
-						{
-							execute_process(terminal[0], terminal, TRUE);
-						}
-						else
-						{
-							printf("Comando %s nao encontrado!\n", terminal[0]);
-						}
+						//if (seek_command(terminal[0], path))
+						//{
+							execute_job(job);
+						//}
+						//else
+						//{
+						//	printf("Comando %s nao encontrado!\n", terminal[0]);
+						//}
 					}
 				}
+				
+				//decide se é pra esperar ou não
+				if (internal_result == DASH_INTERNAL_OK)
+				{
+					//não espera porque já executou o que devia
+				}
+				else
+				{
+					//verifica se tem que deixar o job em background
+					//ou foreground
+					if (!job->background)
+					{
+						wait_job(job);
+					}
+				}
+
 			}
 		}
 		else if(feof(stdin)) {
