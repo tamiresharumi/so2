@@ -31,6 +31,7 @@ struct process
 	char **argv;
 	int pid;
 	int finished;
+	int stopped;
 	int status;
 
 	struct redirection *redirections;
@@ -38,6 +39,8 @@ struct process
 
 struct job
 {
+	struct job *next;
+
 	struct process *processes;
 	int background;
 };

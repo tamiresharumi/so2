@@ -3,15 +3,21 @@
 #include "pipes.h"
 #include "supportedcommands.h"
 #include "tokens.h"
+#include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
-#include <fcntl.h>
 #include <unistd.h>
 
 #define PROMPT " $ "
 #define INST_SIZE 256
+
+//todos os jobs que estão abertos até o momento
+struct job *jobs = 0;
+struct job *foreground_job = 0;
+
 
 int strequal(const char *str1, const char *str2)
 {
@@ -192,6 +198,8 @@ void execute_job(struct job *job)
 				close(pipefd[1]);
 			}
 
+			//redirecionamentos tem que vir depois de redirecionar pro pipe!
+			//http://wiki.bash-hackers.org/howto/redirection_tutorial#duplicating_file_descriptor_2_1
 			handle_redirects(p->redirections);
 
 			execvp(p->argv[0], p->argv);
@@ -238,19 +246,131 @@ void wait_job(struct job *job)
 	struct process *p;
 	int status;
 
+	//WUNTRACED é pra fazer a waitpid retornar caso o processo tenha recebido
+	//um SIGSTOP. Sem isso ela não retorna
 	for (p=job->processes ; p ; p=p->next)
-		waitpid(p->pid, &status, 0);
+	{
+		waitpid(p->pid, &status, WUNTRACED);
+	}
 }
+
+int handle_job_status(int pid, int status)
+{
+	struct job *j;
+	struct process *p;
+
+	if (pid > 0) {
+		for (j=jobs ; j ; j=j->next) {
+			for (p=j->processes ; p ; p=p->next) {
+				if (p->pid == pid)
+				{
+					p->status = status;
+					if (WIFSTOPPED(status))
+						p->stopped = TRUE;
+					else
+					{
+						p->finished = TRUE;
+					}
+
+					return 0;
+				}
+			}
+		}
+	} else if (pid == 0 || errno == ECHILD) {
+		//nenhum processo mudou de estado
+		return -1;
+	} else {
+		perror("waitpid");
+		return -1;
+	}
+	
+	return -1;
+}
+
+void update_job_status()
+{
+	int status;
+	int pid;
+	do {
+		pid = waitpid(WAIT_ANY, &status, WUNTRACED|WNOHANG);
+	} while (!handle_job_status(pid, status));
+}
+
+void finish_jobs()
+{
+	struct job *j = jobs;
+	struct job *last = 0, *next = 0;
+
+	while (j)
+	{
+		int finished = TRUE;
+		struct process *p = j->processes;
+
+		next = j->next;
+
+		//verifica se todos os processos desse job já terminaram
+		while (p)
+		{
+			if (!p->finished)
+			{
+				finished = FALSE;
+				break;
+			}
+			p = p->next;
+		}
+
+		if (finished)
+		{
+			//só mostra o pid do primeiro processo da coisa toda, mas deve
+			//servir como referência.. (é que pode ser um caso com pipe, então
+			//teria que ter mais que um pid..)
+			printf("Job [%i] done\n", p->pid);
+			if (last)
+				last->next = next;
+			else
+				jobs = next;
+		}
+		else
+		{
+			last = j;
+		}
+
+		j = next;
+	}
+}
+
+void signal_handler(int sig, siginfo_t *si, void *unused)
+{
+	(void)si;
+	(void)unused;
+	
+	if (sig == SIGTSTP)
+	{
+		if (foreground_job)
+		{
+			struct process *p = foreground_job->processes;
+			while (p)
+			{
+				//manda os processos do job em primeiro plano pararem. Tadinhos
+				kill(p->pid, SIGSTOP);
+				p = p->next;
+			}
+		}
+	}
+}
+
 
 int main(void)
 {
-	char *path = getenv("PATH");
-	
-	//variaveis para comandos que o shell implementa
-	//int cadastred_comm = 0;
-	//char **commands = chargeCommands("commands.txt", &cadastred_comm, INST_SIZE);
+	//trata o CTRL-Z com carinho
+	struct sigaction sa;
+	sa.sa_flags = SA_SIGINFO;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_sigaction = signal_handler;
+	sigaction(SIGTSTP, &sa, 0);
+	//ignora o CTRL-C
+	signal(SIGINT, SIG_IGN);
 
-	//variaveis x 
 	int num_args = 0;
 	char **terminal;
 	char directory[INST_SIZE];
@@ -266,6 +386,11 @@ int main(void)
 			if((terminal = tokenize(getbuffer, &num_args)) != 0){
 				enum dash_command internal_result;
 				struct job *job;
+
+				//antes de fazer qualquer coisa, passa por todos os jobs e vê
+				//se algum deles mudou de estado
+				update_job_status();
+				finish_jobs();
 
 				if (strequal(terminal[0], "|"))
 				{
@@ -285,20 +410,24 @@ int main(void)
 					internal_result = execute_command(terminal, &keep_running);
 					if (internal_result == DASH_INTERNAL_NOT_FOUND)
 					{
-						//não é comando interno do meu shell fofinho, executar do sistema
-						//depois de checar que ele existe
-
-						//if (seek_command(terminal[0], path))
-						//{
 							execute_job(job);
-						//}
-						//else
-						//{
-						//	printf("Comando %s nao encontrado!\n", terminal[0]);
-						//}
 					}
 				}
 				
+				//adiciona o job na lista de jobs do shell
+				if (jobs == 0)
+				{
+					jobs = job;
+				}
+				else
+				{
+					struct job *j = jobs;
+					while (j->next)
+						j = j->next;
+
+					j->next = job;
+				}
+
 				//decide se é pra esperar ou não
 				if (internal_result == DASH_INTERNAL_OK)
 				{
@@ -310,7 +439,12 @@ int main(void)
 					//ou foreground
 					if (!job->background)
 					{
+						foreground_job = job;
 						wait_job(job);
+					}
+					else
+					{
+						foreground_job = 0;
 					}
 				}
 

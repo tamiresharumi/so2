@@ -15,6 +15,7 @@ $(OBJS): | $(OBJDIR)
 $(OBJDIR):
 	mkdir -p $(OBJDIR)
 
-clear:	
+clean:	
 	rm -f $(OBJDIR)/*.o
+
 

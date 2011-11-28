@@ -327,6 +327,7 @@ struct process* new_process(struct job *job)
 	newp->pid = 0;
 	newp->redirections = 0;
 	newp->status = 0;
+	newp->stopped = 0;
 
 	if (old)
 		old->next = newp;
@@ -390,6 +391,7 @@ struct job* build_job(char **commands)
 	struct job* new_job = malloc(sizeof(struct job));
 	new_job->processes = 0;
 	new_job->background = FALSE;
+	new_job->next = 0;
 
 	parse_result = setjmp(parse_environment);
 
