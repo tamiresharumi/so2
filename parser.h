@@ -43,6 +43,7 @@ struct job
 
 	struct process *processes;
 	int background;
+	char *command_line;
 };
 
 struct job* build_job(char **commands);

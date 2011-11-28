@@ -392,6 +392,7 @@ struct job* build_job(char **commands)
 	new_job->processes = 0;
 	new_job->background = FALSE;
 	new_job->next = 0;
+	new_job->command_line = 0;
 
 	parse_result = setjmp(parse_environment);
 

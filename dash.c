@@ -55,19 +55,31 @@ enum dash_command
 	DASH_INTERNAL_NOT_FOUND
 };
 
+
 enum dash_command execute_command(char** command, int *keep_running){
 	
-	if(strcmp(command[0], "exit") == 0){
+	if (strcmp(command[0], "exit") == 0){
 		*keep_running = FALSE;
 		return DASH_INTERNAL_OK;
 	}
-	else if(strcmp(command[0], "bye") == 0){
+	else if (strcmp(command[0], "bye") == 0){
 		printf("Bye! \\o/\n");
 		*keep_running = FALSE;
 		return DASH_INTERNAL_OK;
 	}
-	else if(0 == strcmp(command[0], "cd")){
+	else if (0 == strcmp(command[0], "cd")){
 		cd(command[1]);
+		return DASH_INTERNAL_OK;
+	}
+	else if (strcmp(command[0], "jobs") == 0) {
+		int i = 0;
+		struct job *j = jobs;
+		while (j)
+		{
+			printf("[%i] %i %s", i, j->processes->pid, j->command_line);
+			j = j->next;
+			++i;
+		}
 		return DASH_INTERNAL_OK;
 	}
 	else 
@@ -127,7 +139,6 @@ void handle_redirects(struct redirection *redirect)
 		}
 
 		//duplica o descritor de arquivo pra fazer o redirecionamento
-		printf("dest_fd, src_fd: %i %i\n", dest_fd, src_fd);
 		if (dup2(dest_fd, src_fd) == -1)
 		{
 			perror("dup2");
@@ -324,7 +335,7 @@ void finish_jobs()
 			//só mostra o pid do primeiro processo da coisa toda, mas deve
 			//servir como referência.. (é que pode ser um caso com pipe, então
 			//teria que ter mais que um pid..)
-			printf("Job [%i] done\n", p->pid);
+			printf("Job [%i] done\n", j->processes->pid);
 			if (last)
 				last->next = next;
 			else
@@ -358,7 +369,6 @@ void signal_handler(int sig, siginfo_t *si, void *unused)
 		}
 	}
 }
-
 
 int main(void)
 {
@@ -399,6 +409,7 @@ int main(void)
 				}
 				
 				job = build_job(terminal);
+				job->command_line = strdup(getbuffer);
 				
 				if (job->processes && job->processes->next)
 				{
@@ -415,17 +426,20 @@ int main(void)
 				}
 				
 				//adiciona o job na lista de jobs do shell
-				if (jobs == 0)
+				if (internal_result == DASH_INTERNAL_NOT_FOUND)
 				{
-					jobs = job;
-				}
-				else
-				{
-					struct job *j = jobs;
-					while (j->next)
-						j = j->next;
+					if (jobs == 0)
+					{
+						jobs = job;
+					}
+					else
+					{
+						struct job *j = jobs;
+						while (j->next)
+							j = j->next;
 
-					j->next = job;
+						j->next = job;
+					}
 				}
 
 				//decide se é pra esperar ou não
