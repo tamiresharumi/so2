@@ -43,6 +43,32 @@ char* seek_command(char* command, char* path){
 	return 0;
 }
 
+int current_num_jobs()
+{
+	int njobs = 0;
+	struct job *j = jobs;
+	while (j)
+	{
+		++njobs;
+		j = j->next;
+	}
+
+	return njobs;
+}
+
+
+//pega o enésimo job da lista de jobs atual
+struct job* get_job(int jobspec)
+{
+	int i = 0;
+	struct job *j = jobs;
+
+	while (i++ != jobspec)
+		j = j->next;
+
+	return j;
+}
+
 void cd(char* param)
 {
 	chdir(param);
@@ -79,6 +105,40 @@ enum dash_command execute_command(char** command, int *keep_running){
 			j = j->next;
 			++i;
 		}
+		return DASH_INTERNAL_OK;
+	}
+	else if (strcmp(command[0], "fg") == 0) {
+		
+		if (!command[1])
+		{
+			fprintf(stderr, "Usage: fg jobspec\n");
+		}
+		else
+		{
+			int jobspec = atoi(command[1]);
+			if (jobspec >= current_num_jobs())
+			{
+				fprintf(stderr, "Unknown jobspec %i\n", jobspec);
+			}
+			else
+			{
+				struct job *j = get_job(jobspec);
+				struct process *p;
+				
+				//manda um SIGCONT pra todos os processos desse job, pra eles
+				//voltarem a rodar!
+				for (p=j->processes ; p ; p=p->next)
+				{
+					p->stopped = FALSE;
+					kill(p->pid, SIGCONT);
+				}
+
+				//marca o job como job do foreground, pra poder ficar esperando
+				//ele terminar daqui pra frente
+				foreground_job = j;
+			}
+		}
+
 		return DASH_INTERNAL_OK;
 	}
 	else 
@@ -372,6 +432,7 @@ int is_finished(struct job *job)
 	return finished;
 }
 
+//espera todos os processos desse job terminarem
 void wait_job(struct job *job)
 {
 	int status;
@@ -481,7 +542,10 @@ int main(void)
 				//decide se é pra esperar ou não
 				if (internal_result == DASH_INTERNAL_OK)
 				{
-					//não espera porque já executou o que devia
+					//se tem um foreground job, é porque passou por um "fg",
+					//então espera o processo terminar a partir de agora
+					if (foreground_job)
+						wait_job(foreground_job);
 				}
 				else
 				{
