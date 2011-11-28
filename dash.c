@@ -143,6 +143,79 @@ void dash_continue_job(const char *command, const char *command_jobspec, int for
 	}
 }
 
+void dash_help(const char *help)
+{
+	if (help)
+	{
+		if (strequal(help, "cd"))
+		{
+			printf(
+				"cd <target directory>\n\n\t"
+				"Changes the current working diretory to <target directory>\n"
+			);
+		}
+		else if (strequal(help, "bg"))
+		{
+			printf(
+				"bg <jobspec>\n\n\t"
+				"Puts the job given by <jobspec> to be run in the background\n"
+			);
+		}
+		else if (strequal(help, "exit"))
+		{
+			printf(
+				"exit\n\n\t"
+				"Quits the current shell\n"
+			);
+		}
+		else if (strequal(help, "bye"))
+		{
+			printf(
+				"bye\n\n\t"
+				"Quits the current shell with a cute message\n"
+			);
+		}
+		else if (strequal(help, "fg"))
+		{
+			printf(
+				"fg <jobspec>\n\n\t"
+				"Puts the job given by <jobspec> to be run in the foreground\n"
+			);
+		}
+		else if (strequal(help, "help"))
+		{
+			printf(
+				"help [command]\n\n\t"
+				"Shows help pages for internal commands\n"
+			);
+		}
+		else if (strequal(help, "jobs"))
+		{
+			printf(
+				"jobs\n\n\t"
+				"Show the current jobs run by the shell and associated jobspecs\n"
+			);
+		}
+		else
+		{
+			printf("Unknown dash internal command: '%s'\n", help);
+		}
+	}
+	else
+	{
+		printf("DASH! DAAAAAAAAAAAAAAAAAAAAAASH ----- DASH!\n");
+		printf("Help for DASH\n\n");
+		printf("These are ---- DASH ----- internal commands\n\n");
+		printf("bg <jobspec>\n");
+		printf("cd <target directory>\n");
+		printf("exit\n");
+		printf("bye\n");
+		printf("fg <jobspec>\n");
+		printf("help\n");
+		printf("jobs\n");
+	}
+}
+
 enum dash_command
 {
 	DASH_INTERNAL_OK,
@@ -174,6 +247,10 @@ enum dash_command execute_command(char** command, int *keep_running){
 	}
 	else if (strcmp(command[0], "bg") == 0) {
 		dash_continue_job(command[0], command[1], FALSE);
+		return DASH_INTERNAL_OK;
+	}
+	else if (strcmp(command[0], "help") == 0) {
+		dash_help(command[1]);
 		return DASH_INTERNAL_OK;
 	}
 	else 
