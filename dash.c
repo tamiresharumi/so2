@@ -18,7 +18,6 @@
 struct job *jobs = 0;
 struct job *foreground_job = 0;
 
-
 int strequal(const char *str1, const char *str2)
 {
 	return 0 == strcmp(str1, str2);
@@ -252,19 +251,6 @@ void execute_job(struct job *job)
 	//terminou! aqui era só pra executar. esperar ou não é problema do shell ;)
 }
 
-void wait_job(struct job *job)
-{
-	struct process *p;
-	int status;
-
-	//WUNTRACED é pra fazer a waitpid retornar caso o processo tenha recebido
-	//um SIGSTOP. Sem isso ela não retorna
-	for (p=job->processes ; p ; p=p->next)
-	{
-		waitpid(p->pid, &status, WUNTRACED);
-	}
-}
-
 int handle_job_status(int pid, int status)
 {
 	struct job *j;
@@ -335,7 +321,13 @@ void finish_jobs()
 			//só mostra o pid do primeiro processo da coisa toda, mas deve
 			//servir como referência.. (é que pode ser um caso com pipe, então
 			//teria que ter mais que um pid..)
-			printf("Job [%i] done\n", j->processes->pid);
+			//e só avisa se o processo que terminou não for o processo que tá
+			//em primeiro plano, porque quando tá em foreground dá pra ver que
+			//terminou sem precisar de mensagem
+			if (j != foreground_job)
+				printf("Job [%i] done\n", j->processes->pid);
+			else
+				foreground_job = 0;
 			if (last)
 				last->next = next;
 			else
@@ -348,6 +340,50 @@ void finish_jobs()
 
 		j = next;
 	}
+}
+
+int is_stopped(struct job *job)
+{
+	int stopped = TRUE;
+	struct process *p;
+
+	for (p=job->processes ; p ; p=p->next) {
+		if (!p->stopped && !p->finished) {
+			stopped = FALSE;
+			break;
+		}
+	}
+
+	return stopped;
+}
+
+int is_finished(struct job *job)
+{
+	int finished = TRUE;
+	struct process *p;
+
+	for (p=job->processes ; p ; p=p->next) {
+		if (!p->finished) {
+			finished = FALSE;
+			break;
+		}
+	}
+
+	return finished;
+}
+
+void wait_job(struct job *job)
+{
+	int status;
+	int pid;
+
+	do {
+		pid = waitpid(WAIT_ANY, &status, WUNTRACED);
+	} while (
+		!handle_job_status(pid, status)	&&
+		!is_stopped(job) &&
+		!is_finished(job)
+	);
 }
 
 void signal_handler(int sig, siginfo_t *si, void *unused)
@@ -404,7 +440,7 @@ int main(void)
 
 				if (strequal(terminal[0], "|"))
 				{
-					printf("Caracter inesperado '|'\n");
+					printf("Unexpected token '|'\n");
 					continue;
 				}
 				
