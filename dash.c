@@ -74,12 +74,56 @@ void cd(char* param)
 	chdir(param);
 }
 
+void dash_jobs()
+{
+	int i = 0;
+	struct job *j = jobs;
+	while (j)
+	{
+		printf("[%i] %i %s", i, j->processes->pid, j->command_line);
+		j = j->next;
+		++i;
+	}
+}
+
+void dash_fg(const char *command_jobspec)
+{
+	if (!command_jobspec)
+	{
+		fprintf(stderr, "Usage: fg jobspec\n");
+	}
+	else
+	{
+		int jobspec = atoi(command_jobspec);
+		if (jobspec >= current_num_jobs())
+		{
+			fprintf(stderr, "Unknown jobspec %i\n", jobspec);
+		}
+		else
+		{
+			struct job *j = get_job(jobspec);
+			struct process *p;
+
+			//manda um SIGCONT pra todos os processos desse job, pra eles
+			//voltarem a rodar!
+			for (p=j->processes ; p ; p=p->next)
+			{
+				p->stopped = FALSE;
+				kill(p->pid, SIGCONT);
+			}
+
+			//marca o job como job do foreground, pra poder ficar esperando
+			//ele terminar daqui pra frente
+			foreground_job = j;
+		}
+	}
+}
+
 enum dash_command
 {
 	DASH_INTERNAL_OK,
 	DASH_INTERNAL_NOT_FOUND
 };
-
 
 enum dash_command execute_command(char** command, int *keep_running){
 	
@@ -97,48 +141,11 @@ enum dash_command execute_command(char** command, int *keep_running){
 		return DASH_INTERNAL_OK;
 	}
 	else if (strcmp(command[0], "jobs") == 0) {
-		int i = 0;
-		struct job *j = jobs;
-		while (j)
-		{
-			printf("[%i] %i %s", i, j->processes->pid, j->command_line);
-			j = j->next;
-			++i;
-		}
+		dash_jobs();
 		return DASH_INTERNAL_OK;
 	}
 	else if (strcmp(command[0], "fg") == 0) {
-		
-		if (!command[1])
-		{
-			fprintf(stderr, "Usage: fg jobspec\n");
-		}
-		else
-		{
-			int jobspec = atoi(command[1]);
-			if (jobspec >= current_num_jobs())
-			{
-				fprintf(stderr, "Unknown jobspec %i\n", jobspec);
-			}
-			else
-			{
-				struct job *j = get_job(jobspec);
-				struct process *p;
-				
-				//manda um SIGCONT pra todos os processos desse job, pra eles
-				//voltarem a rodar!
-				for (p=j->processes ; p ; p=p->next)
-				{
-					p->stopped = FALSE;
-					kill(p->pid, SIGCONT);
-				}
-
-				//marca o job como job do foreground, pra poder ficar esperando
-				//ele terminar daqui pra frente
-				foreground_job = j;
-			}
-		}
-
+		dash_fg(command[1]);
 		return DASH_INTERNAL_OK;
 	}
 	else 
