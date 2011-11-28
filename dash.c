@@ -69,6 +69,21 @@ struct job* get_job(int jobspec)
 	return j;
 }
 
+//pega o jobspec de um determinado job
+int job_number(struct job *job)
+{
+	int i = 0;
+	struct job *j = jobs;
+
+	while (j != job)
+	{
+		j = j->next;
+		++i;
+	}
+	
+	return i;
+}
+
 void cd(char* param)
 {
 	chdir(param);
@@ -84,13 +99,19 @@ void dash_jobs()
 		j = j->next;
 		++i;
 	}
+
+	foreground_job = 0;
 }
 
-void dash_fg(const char *command_jobspec)
+//continua um job dado pelo command_jobspec, colocando ele em foreground se
+//for o caso
+void dash_continue_job(const char *command, const char *command_jobspec, int foreground)
 {
+	foreground_job = 0;
+
 	if (!command_jobspec)
 	{
-		fprintf(stderr, "Usage: fg jobspec\n");
+		fprintf(stderr, "Usage: %s jobspec\n", command);
 	}
 	else
 	{
@@ -112,9 +133,12 @@ void dash_fg(const char *command_jobspec)
 				kill(p->pid, SIGCONT);
 			}
 
-			//marca o job como job do foreground, pra poder ficar esperando
-			//ele terminar daqui pra frente
-			foreground_job = j;
+			if (foreground)
+			{
+				//marca o job como job do foreground, pra poder ficar esperando
+				//ele terminar daqui pra frente
+				foreground_job = j;
+			}
 		}
 	}
 }
@@ -145,7 +169,11 @@ enum dash_command execute_command(char** command, int *keep_running){
 		return DASH_INTERNAL_OK;
 	}
 	else if (strcmp(command[0], "fg") == 0) {
-		dash_fg(command[1]);
+		dash_continue_job(command[0], command[1], TRUE);
+		return DASH_INTERNAL_OK;
+	}
+	else if (strcmp(command[0], "bg") == 0) {
+		dash_continue_job(command[0], command[1], FALSE);
 		return DASH_INTERNAL_OK;
 	}
 	else 
@@ -344,7 +372,12 @@ int handle_job_status(int pid, int status)
 		//nenhum processo mudou de estado
 		return -1;
 	} else {
-		perror("waitpid");
+		//quando errno é EINTR, significa que a chamada waitpid retornou porque
+		//o processo pelo qual se estava esperando foi interrompido, e isso é
+		//um caso esperado, quando aperta CTRL-Z pra parar o processo que está
+		//em foreground, então pode ignorar a mensagem de erro
+		if (errno != EINTR)
+			perror("waitpid");
 		return -1;
 	}
 	
@@ -470,6 +503,12 @@ void signal_handler(int sig, siginfo_t *si, void *unused)
 				kill(p->pid, SIGSTOP);
 				p = p->next;
 			}
+
+			fprintf(stderr, "Stopped [%i] %i %s\n",
+				job_number(foreground_job),
+				foreground_job->processes->pid,
+				foreground_job->command_line
+			);
 		}
 	}
 }
